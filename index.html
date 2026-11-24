@@ -92,7 +92,7 @@ button{border:0;border-radius:11px;padding:11px 15px;background:var(--accent);co
 
   let device = null, server = null, stream = null, audioContext = null, analyser = null, raf = 0, peak = -120;
   const serviceNames = [
-    ['volume_control','Volume Control Service (VCS)'],
+    ['00001844-0000-1000-8000-00805f9b34fb','Volume Control Service (VCS)'],
     ['device_information','Device Information Service']
   ];
 
@@ -118,7 +118,7 @@ button{border:0;border-radius:11px;padding:11px 15px;background:var(--accent);co
       // The browser chooser is user-mediated. Only request standard services for read-only inspection.
       device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
-        optionalServices: ['volume_control', 'device_information']
+        optionalServices: ['00001844-0000-1000-8000-00805f9b34fb', 'device_information']
       });
       device.addEventListener('gattserverdisconnected', onDisconnected);
       $('deviceInfo').hidden = false;
@@ -160,7 +160,7 @@ button{border:0;border-radius:11px;padding:11px 15px;background:var(--accent);co
       row.append(left, right);
       $('services').append(row);
     }
-    const vcs = found.find(x => x.uuid === 'volume_control' && x.service);
+    const vcs = found.find(x => x.uuid === '00001844-0000-1000-8000-00805f9b34fb' && x.service);
     if (vcs) {
       try {
         const ch = await vcs.service.getCharacteristic('volume_state');
