@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111827">
+<title>SoundScope Web</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121d30;--line:#26354d;--muted:#9aabc2;--text:#edf3fb;--accent:#68a8ff;--green:#5dd6a0;--amber:#ffc66d}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#0d1728,#080d17);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:920px;margin:auto;padding:28px 18px 60px}.top{display:flex;align-items:center;gap:14px;margin-bottom:22px}.logo{width:46px;height:46px;border-radius:14px;background:#1c3b63;display:grid;place-items:center;font-size:24px}.sub{color:var(--muted);margin:3px 0 0}.pill{font-size:12px;color:#b9d7ff;border:1px solid #31547d;border-radius:99px;padding:4px 9px;margin-left:auto}
+h1{font-size:25px;margin:0}h2{font-size:18px;margin:0 0 12px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.card{background:rgba(18,29,48,.94);border:1px solid var(--line);border-radius:17px;padding:18px;margin-bottom:14px}.wide{grid-column:1/-1}.muted{color:var(--muted)}.small{font-size:13px}.status{padding:10px 12px;border-radius:10px;background:#0b1525;border:1px solid var(--line);color:var(--muted);margin:12px 0}.status.good{color:var(--green)}.status.warn{color:var(--amber)}
+button{border:0;border-radius:11px;padding:11px 15px;background:var(--accent);color:#081426;font-weight:700;font-size:14px;cursor:pointer}button.secondary{background:#26364d;color:var(--text)}button:disabled{opacity:.45;cursor:not-allowed}.actions{display:flex;gap:9px;flex-wrap:wrap}.device{font-size:18px;font-weight:700;overflow-wrap:anywhere}.kv{display:flex;justify-content:space-between;gap:14px;padding:8px 0;border-bottom:1px solid #223047}.kv:last-child{border:0}.kv span:first-child{color:var(--muted)}.meter{height:12px;border-radius:99px;background:#26354d;overflow:hidden;margin:12px 0}.meter>div{height:100%;width:0;background:linear-gradient(90deg,#5dd6a0,#ffc66d);transition:width .12s}.number{font-size:30px;font-weight:750;font-variant-numeric:tabular-nums}.notice{border-left:3px solid var(--amber);padding:9px 12px;background:#2a2419;color:#f4d9a8;border-radius:7px}.footer{color:var(--muted);font-size:12px;margin-top:20px}
+@media(max-width:680px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}.pill{display:none}main{padding:20px 13px 45px}}
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <div class="logo">◉</div>
+    <div><h1>SoundScope</h1><p class="sub">Nearby device & room-noise investigation</p></div>
+    <span class="pill">WEB PROTOTYPE · READ-ONLY</span>
+  </header>
+
+  <section class="card">
+    <h2>Browser capability</h2>
+    <div id="compat" class="status">Checking browser capabilities…</div>
+    <p class="muted small">Web Bluetooth is available only in supported browsers and secure contexts (HTTPS or localhost). This page cannot perform a background scan of every nearby device.</p>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <h2>1. Bluetooth LE device picker</h2>
+      <p class="muted small">Opens the browser's own chooser. Select a device you are allowed to inspect.</p>
+      <div class="actions">
+        <button id="choose">Choose BLE device</button>
+        <button id="disconnect" class="secondary" disabled>Disconnect</button>
+      </div>
+      <div id="btStatus" class="status">No device selected.</div>
+      <div id="deviceInfo" hidden>
+        <div class="device" id="deviceName">—</div>
+        <div class="kv"><span>Device ID</span><span id="deviceId">—</span></div>
+        <div class="kv"><span>Connection</span><span id="connection">—</span></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2. Read-only service check</h2>
+      <p class="muted small">Checks a small set of standard services only when the device exposes them to this browser session.</p>
+      <div class="actions"><button id="inspect" class="secondary" disabled>Inspect permitted services</button></div>
+      <div id="serviceStatus" class="status">Choose and connect to a BLE device first.</div>
+      <div id="services"></div>
+      <p class="muted small">No characteristics are written and no volume commands are sent.</p>
+    </section>
+
+    <section class="card wide">
+      <h2>3. Room sound monitor</h2>
+      <p class="muted small">Uses your microphone to show relative input level. It is not a calibrated sound-pressure meter and does not identify the source.</p>
+      <div class="actions">
+        <button id="startMic">Start microphone monitor</button>
+        <button id="stopMic" class="secondary" disabled>Stop</button>
+      </div>
+      <div id="micStatus" class="status">Microphone is off.</div>
+      <div class="number" id="level">—</div>
+      <div class="muted small">Relative level (dBFS, approximate)</div>
+      <div class="meter"><div id="meterFill"></div></div>
+      <div class="kv"><span>Peak since start</span><strong id="peak">—</strong></div>
+    </section>
+
+    <section class="card wide">
+      <h2>What this prototype can and cannot do</h2>
+      <ul class="small">
+        <li><b>Can:</b> open a user-mediated BLE device chooser, connect to a selected device, and inspect a limited set of permitted standard GATT services.</li>
+        <li><b>Can:</b> show relative microphone input level while the page is open and microphone permission is granted.</li>
+        <li><b>Cannot:</b> list every nearby Bluetooth device, discover Bluetooth Classic audio speakers, scan silently in the background, or reliably identify which device is producing the gym music.</li>
+        <li><b>Cannot:</b> lower or switch off someone else's equipment. Any future control integration must use an authorized interface for equipment you own or have permission to manage.</li>
+      </ul>
+      <div class="notice small">A BLE device appearing in the chooser does not prove it is a speaker or belongs to the gym. Signal strength and device names can be incomplete or misleading.</div>
+    </section>
+  </div>
+  <p class="footer">SoundScope prototype · Runs locally in your browser. Device and microphone data are not uploaded by this page.</p>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const supported = !!navigator.bluetooth;
+  const secure = window.isSecureContext;
+  $('compat').textContent = supported && secure
+    ? 'Web Bluetooth appears available in this secure browser context.'
+    : (!secure ? 'Not a secure context. Open this page over HTTPS or localhost.' : 'Web Bluetooth is not available in this browser. Try a supported Chromium browser.');
+  $('compat').className = 'status ' + (supported && secure ? 'good' : 'warn');
+
+  let device = null, server = null, stream = null, audioContext = null, analyser = null, raf = 0, peak = -120;
+  const serviceNames = [
+    ['volume_control','Volume Control Service (VCS)'],
+    ['device_information','Device Information Service']
+  ];
+
+  function setBtStatus(message, kind='') {
+    $('btStatus').textContent = message;
+    $('btStatus').className = 'status ' + kind;
+  }
+  function showConnection() {
+    $('connection').textContent = device?.gatt?.connected ? 'Connected' : 'Disconnected';
+    $('disconnect').disabled = !device?.gatt?.connected;
+    $('inspect').disabled = !device?.gatt?.connected;
+  }
+  function onDisconnected() {
+    showConnection();
+    setBtStatus('Device disconnected.');
+    $('serviceStatus').textContent = 'Connect to a device to inspect services.';
+    $('services').innerHTML = '';
+  }
+
+  $('choose').addEventListener('click', async () => {
+    if (!supported || !secure) return setBtStatus('Web Bluetooth unavailable. Use HTTPS/localhost in a supported browser.', 'warn');
+    try {
+      // The browser chooser is user-mediated. Only request standard services for read-only inspection.
+      device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: ['volume_control', 'device_information']
+      });
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+      $('deviceInfo').hidden = false;
+      $('deviceName').textContent = device.name || 'Unnamed BLE device';
+      $('deviceId').textContent = device.id || 'Not exposed by browser';
+      setBtStatus('Device selected. Connecting…');
+      server = await device.gatt.connect();
+      setBtStatus('Connected. You can inspect the permitted services.', 'good');
+      showConnection();
+    } catch (e) {
+      setBtStatus(e.name + ': ' + e.message, 'warn');
+    }
+  });
+
+  $('disconnect').addEventListener('click', () => {
+    if (device?.gatt?.connected) device.gatt.disconnect();
+  });
+
+  $('inspect').addEventListener('click', async () => {
+    if (!server?.connected) return;
+    $('services').innerHTML = '';
+    $('serviceStatus').textContent = 'Checking permitted services…';
+    const found = [];
+    for (const [uuid, label] of serviceNames) {
+      try {
+        const service = await server.getPrimaryService(uuid);
+        found.push({label, uuid, service});
+      } catch (e) {
+        found.push({label, uuid, error: e.name === 'NotFoundError' ? 'Not exposed / not found' : e.name});
+      }
+    }
+    for (const item of found) {
+      const row = document.createElement('div');
+      row.className = 'kv';
+      const left = document.createElement('span');
+      const right = document.createElement('strong');
+      left.textContent = item.label;
+      right.textContent = item.error || 'Available';
+      row.append(left, right);
+      $('services').append(row);
+    }
+    const vcs = found.find(x => x.uuid === 'volume_control' && x.service);
+    if (vcs) {
+      try {
+        const ch = await vcs.service.getCharacteristic('volume_state');
+        const value = await ch.readValue();
+        const volume = value.getUint8(0);
+        const muted = value.byteLength > 1 ? value.getUint8(1) : null;
+        const row = document.createElement('div');
+        row.className = 'kv';
+        const left = document.createElement('span');
+        const right = document.createElement('strong');
+        left.textContent = 'Reported volume state';
+        right.textContent = 'Level ' + volume + (muted === null ? '' : (muted ? ' · muted' : ' · not muted'));
+        row.append(left, right);
+        $('services').append(row);
+      } catch (e) {
+        const row = document.createElement('p');
+        row.className = 'muted small';
+        row.textContent = 'VCS is present, but volume state could not be read: ' + e.name;
+        $('services').append(row);
+      }
+    }
+    $('serviceStatus').textContent = 'Inspection complete. Only readable, permitted standard services were checked.';
+  });
+
+  function drawMeter() {
+    if (!analyser) return;
+    const data = new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(data);
+    let sum = 0;
+    for (const v of data) sum += v * v;
+    const rms = Math.sqrt(sum / data.length);
+    const db = Math.max(-120, 20 * Math.log10(Math.max(rms, 1e-6)));
+    peak = Math.max(peak, db);
+    $('level').textContent = db.toFixed(1) + ' dBFS';
+    $('peak').textContent = peak.toFixed(1) + ' dBFS';
+    $('meterFill').style.width = Math.max(0, Math.min(100, (db + 60) / 60 * 100)) + '%';
+    raf = requestAnimationFrame(drawMeter);
+  }
+
+  $('startMic').addEventListener('click', async () => {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioContext.createMediaStreamSource(stream);
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      peak = -120;
+      $('micStatus').textContent = 'Microphone active. Keep the phone in a consistent position for comparisons.';
+      $('micStatus').className = 'status good';
+      $('startMic').disabled = true;
+      $('stopMic').disabled = false;
+      drawMeter();
+    } catch (e) {
+      $('micStatus').textContent = e.name + ': ' + e.message;
+      $('micStatus').className = 'status warn';
+    }
+  });
+  $('stopMic').addEventListener('click', async () => {
+    cancelAnimationFrame(raf);
+    stream?.getTracks().forEach(t => t.stop());
+    await audioContext?.close();
+    stream = audioContext = analyser = null;
+    $('micStatus').textContent = 'Microphone is off.';
+    $('micStatus').className = 'status';
+    $('startMic').disabled = false;
+    $('stopMic').disabled = true;
+  });
+})();
+</script>
+</body>
+</html>
